@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review Responder AI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f5;min-height:100vh;padding:2rem 1rem}
+.container{max-width:640px;margin:0 auto}
+.logo{font-size:22px;font-weight:600;color:#1a1a1a;margin-bottom:1.5rem}
+.logo span{color:#534AB7}
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+label{display:block;font-size:13px;color:#666;margin-bottom:6px;font-weight:500}
+textarea{width:100%;min-height:110px;resize:vertical;font-size:14px;padding:10px 12px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;color:#1a1a1a;font-family:inherit}
+textarea:focus{outline:none;border-color:#534AB7}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:1rem}
+select{width:100%;font-size:13px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;color:#1a1a1a;font-family:inherit}
+select:focus{outline:none;border-color:#534AB7}
+.btn{width:100%;margin-top:1rem;padding:12px;font-size:15px;font-weight:600;border:none;border-radius:8px;background:#534AB7;color:#fff;cursor:pointer;font-family:inherit}
+.btn:hover{background:#3C3489}
+.btn:disabled{opacity:0.6;cursor:not-allowed}
+.reply-card{background:#f9f9f9;border:1px solid #e5e5e5;border-radius:8px;padding:1rem;margin-bottom:10px}
+.reply-num{font-size:12px;font-weight:600;color:#534AB7;margin-bottom:8px}
+.reply-text{font-size:14px;color:#1a1a1a;line-height:1.6;margin-bottom:10px}
+.copy-btn{font-size:12px;padding:6px 14px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#666;cursor:pointer}
+.copy-btn:hover{background:#f0f0f0;color:#1a1a1a}
+.loading{text-align:center;padding:2rem;font-size:14px;color:#666}
+.error{font-size:13px;color:#c0392b;padding:12px;background:#fdf0f0;border-radius:8px;margin-top:1rem}
+.usage-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.usage-text{font-size:13px;color:#666}
+.badge{font-size:12px;padding:4px 12px;border-radius:20px;background:#EEEDFE;color:#3C3489;font-weight:600}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">Review Responder <span>AI</span></div>
+  <div class="usage-bar">
+    <span class="usage-text">Free plan</span>
+    <span class="badge">10 replies / month</span>
+  </div>
+  <div class="card">
+    <label>Paste a customer review</label>
+    <textarea id="review" placeholder="e.g. The food was cold and the waiter was rude. We waited 45 minutes for our order."></textarea>
+    <div class="row">
+      <div>
+        <label>Platform</label>
+        <select id="platform">
+          <option>Google</option>
+          <option>Yelp</option>
+        </select>
+      </div>
+      <div>
+        <label>Business type</label>
+        <select id="biz">
+          <option>Restaurant</option>
+          <option>Salon</option>
+          <option>Gym</option>
+          <option>Plumber</option>
+          <option>Retail store</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Tone</label>
+        <select id="tone">
+          <option>Friendly</option>
+          <option>Professional</option>
+          <option>Apologetic</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="gen-btn" onclick="generate()">Generate replies</button>
+  </div>
+  <div id="output"></div>
+</div>
+<script>
+const API_KEY = 'YOUR_GEMINI_API_KEY';
+
+async function generate(){
+  const review = document.getElementById('review').value.trim();
+  if(!review){
+    document.getElementById('output').innerHTML='<div class="error">Please paste a review first.</div>';
+    return;
+  }
+  const platform = document.getElementById('platform').value;
+  const biz = document.getElementById('biz').value;
+  const tone = document.getElementById('tone').value;
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  document.getElementById('output').innerHTML = '<div class="loading">Writing your replies...</div>';
+  try {
+    const prompt = `You are helping a small business owner respond to a customer review. Write exactly 3 separate professional responses to this ${platform} review for a ${biz}. Use a ${tone} tone. Keep each under 100 words. Be specific to the review. Return in this exact format:\n\nREPLY1:\n[reply]\n\nREPLY2:\n[reply]\n\nREPLY3:\n[reply]\n\nReview: "${review}"`;
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+    });
+    const data = await resp.json();
+    const text = data.candidates[0].content.parts[0].text;
+    const r1 = text.match(/REPLY1:\n([\s\S]*?)(?=\nREPLY2:)/)?.[1]?.trim();
+    const r2 = text.match(/REPLY2:\n([\s\S]*?)(?=\nREPLY3:)/)?.[1]?.trim();
+    const r3 = text.match(/REPLY3:\n([\s\S]*?)$/)?.[1]?.trim();
+    const replies = [r1, r2, r3].filter(Boolean);
+    if(!replies.length){
+      document.getElementById('output').innerHTML='<div class="error">Could not parse replies. Try again.</div>';
+      return;
+    }
+    document.getElementById('output').innerHTML = replies.map((r,i) => `
+      <div class="reply-card">
+        <div class="reply-num">Reply option ${i+1}</div>
+        <div class="reply-text" id="rt${i}">${r}</div>
+        <button class="copy-btn" onclick="copyReply(${i},this)">Copy</button>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('output').innerHTML = '<div class="error">Something went wrong. Please try again.</div>';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate replies';
+}
+
+function copyReply(i, btn){
+  const text = document.getElementById('rt'+i).textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent = 'Copied!';
+    setTimeout(()=>btn.textContent='Copy', 2000);
+  });
+}
+</script>
+</body>
+</html>
