@@ -24,7 +24,7 @@ select:focus{outline:none;border-color:#534AB7}
 .reply-num{font-size:12px;font-weight:600;color:#534AB7;margin-bottom:8px}
 .reply-text{font-size:14px;color:#1a1a1a;line-height:1.6;margin-bottom:10px}
 .copy-btn{font-size:12px;padding:6px 14px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#666;cursor:pointer}
-.copy-btn:hover{background:#f0f0f0;color:#1a1a1a}
+.copy-btn:hover{background:#f0f0f0}
 .loading{text-align:center;padding:2rem;font-size:14px;color:#666}
 .error{font-size:13px;color:#c0392b;padding:12px;background:#fdf0f0;border-radius:8px;margin-top:1rem}
 .usage-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
@@ -75,7 +75,7 @@ select:focus{outline:none;border-color:#534AB7}
   <div id="output"></div>
 </div>
 <script>
-const API_KEY = 'YOUR_GEMINI_API_KEY';
+const API_KEY = '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';
 
 async function generate(){
   const review = document.getElementById('review').value.trim();
@@ -92,13 +92,20 @@ async function generate(){
   document.getElementById('output').innerHTML = '<div class="loading">Writing your replies...</div>';
   try {
     const prompt = `You are helping a small business owner respond to a customer review. Write exactly 3 separate professional responses to this ${platform} review for a ${biz}. Use a ${tone} tone. Keep each under 100 words. Be specific to the review. Return in this exact format:\n\nREPLY1:\n[reply]\n\nREPLY2:\n[reply]\n\nREPLY3:\n[reply]\n\nReview: "${review}"`;
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({contents:[{parts:[{text: prompt}]}]})
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + API_KEY
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1000,
+        messages: [{role: 'user', content: prompt}]
+      })
     });
     const data = await resp.json();
-    const text = data.candidates[0].content.parts[0].text;
+    const text = data.choices[0].message.content;
     const r1 = text.match(/REPLY1:\n([\s\S]*?)(?=\nREPLY2:)/)?.[1]?.trim();
     const r2 = text.match(/REPLY2:\n([\s\S]*?)(?=\nREPLY3:)/)?.[1]?.trim();
     const r3 = text.match(/REPLY3:\n([\s\S]*?)$/)?.[1]?.trim();
@@ -114,7 +121,7 @@ async function generate(){
         <button class="copy-btn" onclick="copyReply(${i},this)">Copy</button>
       </div>`).join('');
   } catch(e) {
-    document.getElementById('output').innerHTML = '<div class="error">Something went wrong. Please try again.</div>';
+    document.getElementById('output').innerHTML = '<div class="error">Something went wrong: ' + e.message + '</div>';
   }
   btn.disabled = false;
   btn.textContent = 'Generate replies';
